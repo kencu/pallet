@@ -36,57 +36,58 @@ static MPActionLauncher *sharedActionLauncher = nil;
 }
 
 - (void)loadPorts {
-    [self setIsLoading:YES];
-    NSDictionary *allPorts = [[MPMacPorts sharedInstance] search:MPPortsAll];
-    NSDictionary *installedPorts = [[MPRegistry sharedRegistry] installed];
-    
-    [self willChangeValueForKey:@"ports"];
-    for (id port in installedPorts) {
-        [[allPorts objectForKey:port] setStateFromReceipts:[installedPorts objectForKey:port]];
-    }
-    ports = [allPorts allValues];
-    [self didChangeValueForKey:@"ports"];
-    
-    [self setIsLoading:NO];
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        [self setIsLoading:YES];
+        NSDictionary *allPorts = [[MPMacPorts sharedInstance] search:MPPortsAll];
+        NSDictionary *installedPorts = [[MPRegistry sharedRegistry] installed];
+
+        [self willChangeValueForKey:@"ports"];
+        for (id port in installedPorts) {
+            [[allPorts objectForKey:port] setStateFromReceipts:[installedPorts objectForKey:port]];
+        }
+        ports = [allPorts allValues];
+
+        [self didChangeValueForKey:@"ports"];
+
+        [self setIsLoading:NO];
+    });
 }
 
 - (void)installPort:(MPPort *)port {
-	errorReceived=NO;
+    errorReceived=NO;
     NSError * error;
     NSArray *empty = [NSArray arrayWithObject: @""];
     [port installWithOptions:empty variants:empty error:&error];
-	//Check if we have received an error, send the apropriate notification, and if everything is fine
-	//send a notification to the main thread that we have completed our operation, and to advance the queue
+    //Check if we have received an error, send the apropriate notification, and if everything is fine
+    //send a notification to the main thread that we have completed our operation, and to advance the queue
 
-	if(errorReceived)
-		[self sendNotification: GROWL_INSTALLFAILED];
-	else
-	{
-		[self sendNotification: GROWL_INSTALL];
-		[[NSNotificationCenter defaultCenter] postNotificationName:@"advanceQ" object:nil userInfo:nil];
-	}
-	
+    if(errorReceived)
+        [self sendNotification: GROWL_INSTALLFAILED];
+    else
+    {
+        [self sendNotification: GROWL_INSTALL];
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"advanceQ" object:nil userInfo:nil];
+    }
 }
 
 - (void)installPortWithVariants:(NSArray *) portAndVariants {
-	errorReceived=NO;
+    errorReceived=NO;
     NSError * error;
     NSArray *empty = [NSArray arrayWithObject: @""];
-	//Because we get the port and the variants mixed in an array, we copy the port to a local variable,
-	//and the variants array to a local array
-	MPPort* port = [portAndVariants objectAtIndex:0];
-	NSArray *variants = [portAndVariants objectAtIndex:1];
+    //Because we get the port and the variants mixed in an array, we copy the port to a local variable,
+    //and the variants array to a local array
+    MPPort* port = [portAndVariants objectAtIndex:0];
+    NSArray *variants = [portAndVariants objectAtIndex:1];
     [port installWithOptions:empty variants:variants error:&error];
-	//Check if we have received an error, send the apropriate notification, and if everything is fine
-	//send a notification to the main thread that we have completed our operation, and to advance the queue
-	if(errorReceived)
-		[self sendNotification: GROWL_INSTALLFAILED];
-	else
-	{
-		[self sendNotification: GROWL_INSTALL];
-		[[NSNotificationCenter defaultCenter] postNotificationName:@"advanceQ" object:nil userInfo:nil];
-	}
-	
+    //Check if we have received an error, send the apropriate notification, and if everything is fine
+    //send a notification to the main thread that we have completed our operation, and to advance the queue
+    if(errorReceived)
+        [self sendNotification: GROWL_INSTALLFAILED];
+    else
+    {
+        [self sendNotification: GROWL_INSTALL];
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"advanceQ" object:nil userInfo:nil];
+    }
 }
 
 - (void)uninstallPort:(MPPort *)port {
@@ -169,18 +170,21 @@ static MPActionLauncher *sharedActionLauncher = nil;
 }
 
 - (void)sync {
-	errorReceived=NO;
-    NSError * error;
-    [[MPMacPorts sharedInstance] sync:&error];
-	//Check if we have received an error, send the apropriate notification, and if everything is fine
-	//send a notification to the main thread that we have completed our operation, and to advance the queue
-	if(errorReceived)
-		[self sendNotification: GROWL_SYNCFAILED];
-	else
-	{
-		[self sendNotification: GROWL_SYNC];
-		[[NSNotificationCenter defaultCenter] postNotificationName:@"advanceQ" object:nil userInfo:nil];
-	}
+    dispatch_sync(dispatch_get_main_queue(), ^{
+
+        errorReceived=NO;
+        NSError * error;
+        [[MPMacPorts sharedInstance] sync:&error];
+        //Check if we have received an error, send the apropriate notification, and if everything is fine
+        //send a notification to the main thread that we have completed our operation, and to advance the queue
+        if(errorReceived)
+            [self sendNotification: GROWL_SYNCFAILED];
+        else
+        {
+            [self sendNotification: GROWL_SYNC];
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"advanceQ" object:nil userInfo:nil];
+        }
+    });
 }
 
 - (void)selfupdate {
